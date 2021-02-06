@@ -1,7 +1,8 @@
 local BasePlugin = require "kong.plugins.base_plugin"
 local jwt_decoder = require "kong.plugins.jwt.jwt_parser"
 local JWT_PLUGIN_PRIORITY = (require "kong.plugins.jwt.handler").PRIORITY
-local CLAIM_HEADERS = require "kong.plugins.jwt-claim-headers.claim_headers"
+
+local MAPPED_HEADER_PREFIX = "X-Consumer-"
 
 local ngx_set_header = ngx.req.set_header
 local ngx_re_gmatch = ngx.re.gmatch
@@ -51,10 +52,7 @@ function JwtClaimHeadersHandler:access(conf)
   local claims = jwt.claims
 
   for claim_key, claim_value in pairs(claims) do
-    request_header = CLAIM_HEADERS[claim_key]
-    if request_header ~= nil then
-      ngx_set_header(request_header, claim_value)
-    end
+      ngx_set_header(MAPPED_HEADER_PREFIX .. claim_key, claim_value)
   end
 end
 
