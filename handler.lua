@@ -14,14 +14,6 @@ local JwtClaimHeadersHandler = BasePlugin:extend()
 JwtClaimHeadersHandler.PRIORITY = JWT_PLUGIN_PRIORITY - 100
 
 local function retrieve_token(request, conf)
-  local uri_parameters = request.get_uri_args()
-
-  for _, v in ipairs(conf.uri_param_names) do
-    if uri_parameters[v] then
-      return uri_parameters[v]
-    end
-  end
-
   local authorization_header = request.get_headers()["authorization"]
   if authorization_header then
     local iterator, iter_err = ngx_re_gmatch(authorization_header, "\\s*[Bb]earer\\s+(.+)")
@@ -47,8 +39,20 @@ end
 function JwtClaimHeadersHandler:access(conf)
   JwtClaimHeadersHandler.super.access(self)
 
-  local token, _ = retrieve_token(ngx.req, conf)
-  local jwt, _ = jwt_decoder:new(token)
+  local token, err = retrieve_token(ngx.req, conf)
+  if err or not token then
+    return kong.response.exit(401, [[{"message":"unauthorized"}]], {
+      ["Content-Type"] = "application/json",
+    })
+  end
+
+  local jwt, err = jwt_decoder:new(token)
+  -- Now verify the JWT signature
+  if not jwt:verify_signature(conf.jwt_secret) or err then
+    return kong.response.exit(401, [[{"message":"unauthorized"}]], {
+      ["Content-Type"] = "application/json",
+    })  end
+
   local claims = jwt.claims
 
   for claim_key, claim_value in pairs(claims) do
